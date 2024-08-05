@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finsmartapi-deployment
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app: finsmartapi
+  template:
+    metadata:
+      labels:
+        app: finsmartapi
+    spec:
+      containers:
+      - name: finsmart-container
+        image: registryeastusfinsmart.azurecr.io/finsmart:22
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
