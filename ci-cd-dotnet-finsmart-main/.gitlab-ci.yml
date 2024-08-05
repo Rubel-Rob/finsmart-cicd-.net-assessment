@@ -1,0 +1,103 @@
+stages:
+  - code-analysis
+  - file-scan
+  - build-image
+  - image-scan
+  - aks-deploy
+
+# Checking Code Vulnerabilities
+sonarqube-check:
+  stage: code-analysis
+  image: 
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script: 
+    - sonar-scanner
+  allow_failure: true
+  only:
+    - main
+
+# File Scan using Trivy
+Trivy file scan:
+  stage: file-scan
+  image: 
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  before_script:
+    - mkdir -p trivy-file-scan
+  script: 
+    - trivy fs . -o trivy-file-scan/trivy-file-scan-finsmart:$CI_PIPELINE_IID.txt
+  artifacts:
+    untracked: false
+    when: on_success
+    expire_in: 30 days
+    paths:
+      - "trivy-file-scan"
+
+# Docker Image Building and pushing to ACR
+Image Building :
+  stage: build-image
+  image:
+    name: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t $ACR_REGISTRY/finsmart:$CI_PIPELINE_IID .
+    - echo "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
+    - docker push $ACR_REGISTRY/finsmart:$CI_PIPELINE_IID
+
+
+docker-image-scan:
+  stage: image-scan
+  image: 
+    name: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - docker login -u "$ACR_USERNAME" -p "$ACR_PASSWORD" "$ACR_REGISTRY"
+    - mkdir -p trivy-image-scan
+    - apk add --no-cache curl  # Install curl to download Trivy
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+  script:
+    - trivy image $ACR_REGISTRY/finsmart:$CI_PIPELINE_IID > trivy-image-scan/trivy-image-scan-finsmart:$CI_PIPELINE_IID.txt
+  artifacts:
+    untracked: false
+    when: on_success
+    expire_in: 30 days
+    paths:
+      - "trivy-image-scan"
+
+deploy-to-aks:
+  stage: aks-deploy
+  image: ubuntu:latest
+  before_script:
+    - apt-get update -y && apt-get upgrade -y
+    - apt-get install -y curl apt-transport-https lsb-release gnupg ca-certificates
+    - curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
+    - mv microsoft.gpg /etc/apt/trusted.gpg.d/
+    - echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/azure-cli.list
+    - apt-get update
+    - apt-get install -y azure-cli
+    - curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    - chmod +x ./kubectl && mv ./kubectl /usr/local/bin/kubectl
+
+  script:
+    - az --version
+    - kubectl version --client
+    - az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+    - az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+    - az aks get-credentials --resource-group $AZURE_RESOURCE_GROUP --name $AZURE_AKS_CLUSTER
+    - cd $CI_PROJECT_DIR/kubernetes-manifests
+    - ls -la
+    - kubectl apply -f deployment.yaml -n finsmart
+    - kubectl apply -f service.yaml -n finsmart
