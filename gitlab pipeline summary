@@ -1,0 +1,27 @@
+Stages Overview
+code-analysis: Analyzes the codebase for vulnerabilities and code quality issues.
+file-scan: Scans the project files for vulnerabilities using Trivy.
+build-image: Builds a Docker image of the application and pushes it to an Azure Container Registry (ACR).
+image-scan: Scans the Docker image for vulnerabilities using Trivy.
+aks-deploy: Deploys the application to AKS.
+Detailed Stage Breakdown
+Code Analysis with SonarQube
+Purpose: Identifies code quality issues and vulnerabilities early in the development cycle.
+Tools: Uses SonarQube Scanner CLI.
+Process: Executes sonar-scanner to analyze the codebase. Results are cached for faster subsequent analyses.
+File Scan with Trivy
+Purpose: Scans the project files for vulnerabilities.
+Tools: Uses Trivy, a simple and comprehensive vulnerability scanner for containers and other artifacts.
+Process: Runs trivy fs . to scan the entire project directory. Results are saved in a specified output directory.
+Build and Push Docker Image
+Purpose: Builds a Docker image of the application and pushes it to ACR.
+Tools: Uses Docker CLI.
+Process: Builds the Docker image with docker build, logs into ACR with credentials, and pushes the image to ACR.
+Image Scan with Trivy
+Purpose: Scans the Docker image for vulnerabilities.
+Tools: Uses Trivy.
+Process: Downloads Trivy, scans the Docker image with trivy image, and saves the results in a specified output directory.
+Deploy to AKS
+Purpose: Deploys the application to AKS.
+Tools: Uses Azure CLI and kubectl.
+Process: Installs Azure CLI and kubectl, logs into Azure with service principal credentials, sets the subscription, retrieves AKS credentials, and applies Kubernetes manifests to deploy the application.
