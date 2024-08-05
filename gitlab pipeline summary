@@ -24,4 +24,7 @@ Process: Downloads Trivy, scans the Docker image with trivy image, and saves the
 Deploy to AKS
 Purpose: Deploys the application to AKS.
 Tools: Uses Azure CLI and kubectl.
-Process: Installs Azure CLI and kubectl, logs into Azure with service principal credentials, sets the subscription, retrieves AKS credentials, and applies Kubernetes manifests to deploy the application.
+Process: Installs Azure CLI and kubectl, logs into Azure with service principal credentials, sets the subscription, retrieves 
+AKS credentials, and applies Kubernetes manifests to deploy the application.
+
+https://medium.com/@robraut97/cicd-deployment-for-net-app-on-azure-aks-using-gitlab-ci-15b0b8bd9294
